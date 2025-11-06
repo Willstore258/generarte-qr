@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR Code Generator</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;color:#111}
+    body{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:linear-gradient(180deg,#f6fbff,#eef7ff)}
+    .card{width:100%;max-width:760px;background:white;border-radius:12px;padding:22px;box-shadow:0 8px 30px rgba(20,40,80,0.08)}
+    h1{font-size:20px;margin:0 0 10px}
+    .row{display:flex;gap:12px;align-items:center}
+    label{font-size:13px;color:#444}
+    input[type=text], select {flex:1;padding:10px;border:1px solid #e3e8f0;border-radius:8px;font-size:14px}
+    input[type=number]{width:120px}
+    button{padding:10px 14px;border-radius:8px;border:0;background:#2563eb;color:white;font-weight:600;cursor:pointer}
+    button.secondary{background:#f3f4f6;color:#111}
+    .preview{margin-top:18px;display:flex;gap:20px;align-items:center}
+    .preview .box{width:260px;height:260px;display:flex;align-items:center;justify-content:center;border:1px dashed #e6eefc;border-radius:8px;background:linear-gradient(180deg,#fff,#f8fcff)}
+    .meta{flex:1}
+    .note{font-size:13px;color:#666;margin-top:8px}
+    .small{font-size:13px;color:#666}
+    .error{color:#b91c1c}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>QR Code Generator (menggunakan API)</h1>
+    <div class="row" style="margin-bottom:10px">
+      <label for="text">Teks / URL</label>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <input id="text" type="text" placeholder="Masukkan teks atau URL..." value="https://" />
+      <input id="size" type="number" min="64" max="2000" value="300" title="Ukuran (px)" />
+      <button id="gen">Generate</button>
+    </div>
+
+    <div class="row" style="margin-bottom:8px">
+      <button id="download" class="secondary">Download PNG</button>
+      <button id="open" class="secondary">Open in new tab</button>
+      <button id="clear" class="secondary">Clear</button>
+      <div style="margin-left:auto" class="small">API: goqr.me / qrserver</div>
+    </div>
+
+    <div class="preview">
+      <div class="box" id="box">
+        <span id="placeholder">Belum ada QR</span>
+        <img id="qr" alt="QR preview" style="display:none;max-width:100%;max-height:100%;border-radius:6px" />
+      </div>
+      <div class="meta">
+        <div class="note">Preview akan dibuat dari API. Jika input kosong Anda akan melihat pesan <em>No QR</em>.</div>
+        <div style="margin-top:12px">
+          <div class="small"><strong>Input:</strong> <span id="out-text">-</span></div>
+          <div class="small"><strong>Ukuran:</strong> <span id="out-size">-</span> px</div>
+        </div>
+        <p class="note">Catatan: file di-download sebagai PNG. Jika API tidak merespons, periksa koneksi atau coba ukuran berbeda.</p>
+        <div id="msg" class="error" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Endpoint yang digunakan: public QR API. User menyebut: https://goqr.me/api/
+    // Implementasi ini membentuk URL request yang kompatibel dengan layanan QR public (qrserver).
+    const qrImg = document.getElementById('qr');
+    const placeholder = document.getElementById('placeholder');
+    const input = document.getElementById('text');
+    const sizeInput = document.getElementById('size');
+    const genBtn = document.getElementById('gen');
+    const outText = document.getElementById('out-text');
+    const outSize = document.getElementById('out-size');
+    const msg = document.getElementById('msg');
+
+    function buildApiUrl(text, size){
+      // Menggunakan qrserver API (compatible dengan goqr.me docs). Jika Anda ingin pakai URL lain,
+      // ganti baseUrl sesuai instruksi API yang Anda sediakan.
+      const baseUrl = 'https://api.qrserver.com/v1/create-qr-code/';
+      const params = new URLSearchParams({data: text, size: size + 'x' + size});
+      return baseUrl + '?' + params.toString();
+    }
+
+    async function generate(){
+      msg.textContent = '';
+      const text = input.value.trim();
+      const size = parseInt(sizeInput.value, 10) || 300;
+      outText.textContent = text || '-';
+      outSize.textContent = size;
+
+      if(!text){
+        showNoQR('Masukkan teks atau URL untuk membuat QR.');
+        return;
+      }
+
+      const url = buildApiUrl(text, size);
+      // Tampilkan preview
+      qrImg.src = url;
+      qrImg.onload = () => {
+        placeholder.style.display = 'none';
+        qrImg.style.display = 'block';
+      };
+      qrImg.onerror = () => {
+        showNoQR('Gagal memuat QR (API error atau jaringan). Coba lagi.');
+      };
+    }
+
+    function showNoQR(message){
+      qrImg.style.display = 'none';
+      placeholder.style.display = 'block';
+      msg.textContent = message || '';
+    }
+
+    genBtn.addEventListener('click', (e)=>{ e.preventDefault(); generate(); });
+
+    document.getElementById('open').addEventListener('click', ()=>{
+      const text = input.value.trim();
+      if(!text){ showNoQR('Masukkan teks atau URL terlebih dahulu.'); return; }
+      const size = parseInt(sizeInput.value,10) || 300;
+      window.open(buildApiUrl(text,size),'_blank');
+    });
+
+    document.getElementById('clear').addEventListener('click', ()=>{
+      input.value = '';
+      sizeInput.value = 300;
+      outText.textContent = '-';
+      outSize.textContent = '-';
+      qrImg.src = '';
+      showNoQR('Belum ada QR');
+      msg.textContent = '';
+    });
+
+    document.getElementById('download').addEventListener('click', async ()=>{
+      const text = input.value.trim();
+      if(!text){ showNoQR('Masukkan teks atau URL terlebih dahulu.'); return; }
+      const size = parseInt(sizeInput.value,10) || 300;
+      const url = buildApiUrl(text,size);
+      try{
+        const res = await fetch(url);
+        if(!res.ok) throw new Error('Network response not ok');
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        const objectUrl = URL.createObjectURL(blob);
+        a.href = objectUrl;
+        a.download = 'qrcode.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      }catch(err){
+        msg.textContent = 'Gagal mengunduh: ' + err.message;
+      }
+    });
+
+    // Inisialisasi
+    showNoQR('Belum ada QR');
+  </script>
+</body>
+</html>
