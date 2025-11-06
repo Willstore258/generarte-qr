@@ -1,0 +1,1 @@
+# generarte-qr
